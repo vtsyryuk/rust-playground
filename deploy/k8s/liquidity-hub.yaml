@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: liquidity-hub
+  labels:
+    app: liquidity-hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: liquidity-hub
+  template:
+    metadata:
+      labels:
+        app: liquidity-hub
+    spec:
+      containers:
+        - name: liquidity-hub
+          image: ghcr.io/your-org/liquidity-hub:latest
+          imagePullPolicy: IfNotPresent
+          args: ["--ticks", "1000"]
+          env:
+            - name: RUST_LOG
+              value: info
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector:4317
+          resources:
+            requests:
+              cpu: "1"
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: liquidity-hub
+spec:
+  selector:
+    app: liquidity-hub
+  ports:
+    - name: admin
+      port: 8080
+      targetPort: 8080
+
