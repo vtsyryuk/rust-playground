@@ -1,0 +1,62 @@
+name: SonarCloud Analysis
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  analysis:
+    name: Analyze
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Build LCOV coverage
+        run: cargo llvm-cov --workspace --locked --lcov --output-path target/coverage/lcov.info
+
+      - name: SonarCloud token notice
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "::notice title=SonarCloud scan skipped::Add repository secret SONAR_TOKEN from SonarCloud to enable analysis."
+
+      - name: SonarCloud project notice
+        if: env.SONAR_TOKEN != '' && (env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '')
+        run: |
+          echo "::notice title=SonarCloud scan skipped::Add repository variables SONAR_ORGANIZATION and SONAR_PROJECT_KEY after importing this repository in SonarCloud."
+
+      - name: Analyze with SonarCloud
+        if: env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != ''
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}

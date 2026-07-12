@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: rust-playground-liquidity-hub
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: LH_SERVE_ADMIN
+        value: "true"
+      - key: LH_TICKS
+        value: 100
+      - key: RUST_LOG
+        value: info

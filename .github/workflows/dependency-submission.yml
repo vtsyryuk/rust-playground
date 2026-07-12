@@ -1,0 +1,87 @@
+name: Dependency Submission
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  submit-dependencies:
+    name: Submit Rust Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Capture Cargo metadata
+        run: cargo metadata --locked --format-version 1 > cargo-metadata.json
+
+      - name: Submit dependency snapshot
+        id: dependency-submission
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+            const metadata = JSON.parse(fs.readFileSync('cargo-metadata.json', 'utf8'));
+            const detector = {
+              name: 'cargo metadata',
+              version: '1',
+              url: 'https://doc.rust-lang.org/cargo/commands/cargo-metadata.html'
+            };
+            const manifests = {};
+
+            for (const pkg of metadata.packages) {
+              const manifestPath = pkg.manifest_path.replace(`${process.env.GITHUB_WORKSPACE}/`, '');
+              const key = `${pkg.name}@${pkg.version}`;
+              const relationship = metadata.workspace_members.includes(pkg.id) ? 'direct' : 'indirect';
+              manifests[manifestPath] ??= {
+                name: manifestPath,
+                file: { source_location: manifestPath },
+                resolved: {}
+              };
+              manifests[manifestPath].resolved[key] = {
+                package_url: `pkg:cargo/${pkg.name}@${pkg.version}`,
+                relationship,
+                scope: 'runtime',
+                dependencies: pkg.dependencies.map(dep => dep.name)
+              };
+            }
+
+            const sha = context.sha;
+            const ref = context.ref;
+            const snapshot = {
+              version: 0,
+              sha,
+              ref,
+              job: {
+                id: `${context.runId}`,
+                correlator: `${context.workflow}-${context.job}`,
+                html_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+              },
+              detector,
+              scanned: new Date().toISOString(),
+              manifests
+            };
+
+            const body = JSON.stringify(snapshot);
+            const digest = crypto.createHash('sha256').update(body).digest('hex');
+            core.info(`Submitting Cargo dependency snapshot ${digest}`);
+            await github.request('POST /repos/{owner}/{repo}/dependency-graph/snapshots', {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ...snapshot
+            });
+
+      - name: Dependency graph disabled notice
+        if: steps.dependency-submission.outcome == 'failure'
+        run: |
+          echo "::notice title=Dependency graph submission skipped::GitHub rejected the dependency snapshot. Enable Dependency graph in repository Code security settings."

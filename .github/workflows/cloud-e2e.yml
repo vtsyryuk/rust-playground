@@ -1,0 +1,40 @@
+name: Cloud E2E
+
+on:
+  deployment_status:
+  schedule:
+    - cron: '47 3 * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Cloud service URL to test
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-health:
+    name: Run Cloud Health Checks
+    runs-on: ubuntu-latest
+    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    env:
+      CLOUD_BASE_URL: ${{ inputs.base_url || vars.CLOUD_BASE_URL }}
+
+    steps:
+      - name: Cloud URL notice
+        if: env.CLOUD_BASE_URL == ''
+        run: |
+          echo "::notice title=Cloud E2E skipped::Set repository variable CLOUD_BASE_URL or provide workflow_dispatch input base_url."
+
+      - name: Check health endpoint
+        if: env.CLOUD_BASE_URL != ''
+        run: |
+          curl --fail --show-error --silent --max-time 10 "${CLOUD_BASE_URL%/}/health"
+
+      - name: Check readiness endpoint
+        if: env.CLOUD_BASE_URL != ''
+        run: |
+          curl --fail --show-error --silent --max-time 10 "${CLOUD_BASE_URL%/}/ready"
+

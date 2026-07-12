@@ -1,5 +1,16 @@
 # Rust Liquidity Hub Playground
 
+[![CI](https://github.com/vtsyryuk/rust-playground/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/ci.yml)
+[![Coverage](https://github.com/vtsyryuk/rust-playground/actions/workflows/coverage.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/coverage.yml)
+[![CodeQL](https://github.com/vtsyryuk/rust-playground/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/codeql.yml)
+[![SonarCloud](https://github.com/vtsyryuk/rust-playground/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/sonarcloud.yml)
+[![Rust Security](https://github.com/vtsyryuk/rust-playground/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/security.yml)
+[![Dependency Review](https://github.com/vtsyryuk/rust-playground/actions/workflows/dependency-review.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/dependency-review.yml)
+[![Dependency Submission](https://github.com/vtsyryuk/rust-playground/actions/workflows/dependency-submission.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/dependency-submission.yml)
+[![CD](https://github.com/vtsyryuk/rust-playground/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/cd.yml)
+[![Publish](https://github.com/vtsyryuk/rust-playground/actions/workflows/publish.yml/badge.svg)](https://github.com/vtsyryuk/rust-playground/actions/workflows/publish.yml)
+[![Cloud E2E](https://github.com/vtsyryuk/rust-playground/actions/workflows/cloud-e2e.yml/badge.svg?branch=main)](https://github.com/vtsyryuk/rust-playground/actions/workflows/cloud-e2e.yml)
+
 This repository is a learning project for building a low-latency Rust microservice for an equities cash trading platform.
 
 The service acts as a liquidity hub:
@@ -67,6 +78,7 @@ Cloud Kubernetes is useful for development, integration, replay, and control-pla
 - `docs/observability.md`: logging and OpenTelemetry guidance
 - `docs/cicd.md`: CI/CD publishing and deployment notes
 - `deploy/k8s`: Kubernetes deployment skeleton
+- `render.yaml`: Render Blueprint for a simple cloud health-check deployment
 - `.github/workflows/ci.yml`: build and test pipeline
 
 ## Commands
@@ -87,12 +99,29 @@ cargo test --workspace
 cargo build --release --workspace
 ```
 
+Run the cloud-style health endpoint locally:
+
+```bash
+LH_SERVE_ADMIN=true RUST_LOG=info cargo run -p liquidity-hub-app -- --ticks 100
+curl http://localhost:8080/health
+curl http://localhost:8080/ready
+```
+
 ## CI/CD
 
 GitHub Actions are configured with:
 
 - `.github/workflows/ci.yml`: format, clippy, tests, release build, and Docker build check
-- `.github/workflows/cd.yml`: publish image to GitHub Container Registry on `main`, `master`, and `v*` tags
+- `.github/workflows/actions.yml`: actionlint validation for workflow files
+- `.github/workflows/coverage.yml`: LCOV coverage with `cargo-llvm-cov`
+- `.github/workflows/codeql.yml`: Rust CodeQL analysis
+- `.github/workflows/sonarcloud.yml`: SonarCloud analysis when `SONAR_TOKEN`, `SONAR_ORGANIZATION`, and `SONAR_PROJECT_KEY` are configured
+- `.github/workflows/security.yml`: RustSec audit and cargo-deny policy checks
+- `.github/workflows/dependency-review.yml`: dependency review for pull requests
+- `.github/workflows/dependency-submission.yml`: Cargo dependency snapshot submission to GitHub's dependency graph
+- `.github/workflows/cd.yml`: publish image to GitHub Container Registry on `main` and `v*` tags
+- `.github/workflows/publish.yml`: release/manual image publishing
+- `.github/workflows/cloud-e2e.yml`: cloud health checks against `CLOUD_BASE_URL`
 - optional manual Kubernetes deploy using repository secret `KUBE_CONFIG`
 
 See `docs/cicd.md` for operating notes.
@@ -102,6 +131,25 @@ Published images use:
 ```text
 ghcr.io/<owner>/<repo>/liquidity-hub:<git-sha>
 ```
+
+### Build Artifacts
+
+- Release binary: `target/release/liquidity-hub-app`
+- Docker image: `ghcr.io/vtsyryuk/rust-playground/liquidity-hub:<git-sha>`
+- Coverage LCOV: `target/coverage/lcov.info`
+- Local logs: `logs/liquidity-hub.jsonl`
+- Kubernetes manifest: `deploy/k8s/liquidity-hub.yaml`
+- Render Blueprint: `render.yaml`
+
+### Quality Gates
+
+- Formatting: `cargo fmt --all -- --check`
+- Linting: `cargo clippy --workspace --all-targets -- -D warnings`
+- Tests: `cargo test --workspace --locked`
+- Coverage: `cargo llvm-cov --workspace --locked --lcov --output-path target/coverage/lcov.info`
+- Audit: RustSec through `.github/workflows/security.yml`
+- Policy: cargo-deny through `deny.toml`
+- Static analysis: CodeQL and SonarCloud
 
 ## Chronicle Integration
 

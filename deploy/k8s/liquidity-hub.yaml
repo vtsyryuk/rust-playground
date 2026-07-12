@@ -22,8 +22,27 @@ spec:
           env:
             - name: RUST_LOG
               value: info
+            - name: LH_SERVE_ADMIN
+              value: "true"
+            - name: PORT
+              value: "8080"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://otel-collector:4317
+          ports:
+            - name: admin
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: admin
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 3
+            periodSeconds: 10
           resources:
             requests:
               cpu: "1"
@@ -43,4 +62,3 @@ spec:
     - name: admin
       port: 8080
       targetPort: 8080
-
