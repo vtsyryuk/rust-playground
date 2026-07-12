@@ -16,7 +16,7 @@ Additional validation workflows:
 
 - `GitHub Actions`: lints workflow YAML with actionlint
 - `Coverage`: generates LCOV coverage with `cargo-llvm-cov`
-- `CodeQL`: scans Rust code with GitHub code scanning
+- `CodeQL`: scans Rust code and uploads SARIF results as workflow artifacts
 - `Rust Security`: runs RustSec audit and cargo-deny policy checks
 - `Dependency Review`: reviews dependency changes on pull requests
 - `Dependency Submission`: submits Cargo dependency snapshots to GitHub's dependency graph
@@ -62,6 +62,12 @@ For SonarCloud:
 - Import the repository in SonarCloud.
 - Add repository secret `SONAR_TOKEN`.
 - Add repository variables `SONAR_ORGANIZATION` and `SONAR_PROJECT_KEY`.
+
+For CodeQL:
+
+- The workflow always runs Rust CodeQL analysis and stores SARIF output in the `codeql-rust-sarif` artifact.
+- Keep `CODEQL_UPLOAD` unset unless GitHub code scanning advanced setup is enabled for the repository.
+- Set repository variable `CODEQL_UPLOAD=always` only when SARIF uploads to the Security tab are supported. GitHub default setup cannot be enabled at the same time as this advanced Rust workflow.
 
 ## Local Parity
 

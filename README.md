@@ -114,7 +114,7 @@ GitHub Actions are configured with:
 - `.github/workflows/ci.yml`: format, clippy, tests, release build, and Docker build check
 - `.github/workflows/actions.yml`: actionlint validation for workflow files
 - `.github/workflows/coverage.yml`: LCOV coverage with `cargo-llvm-cov`
-- `.github/workflows/codeql.yml`: Rust CodeQL analysis
+- `.github/workflows/codeql.yml`: Rust CodeQL analysis with SARIF results uploaded as workflow artifacts
 - `.github/workflows/sonarcloud.yml`: SonarCloud analysis when `SONAR_TOKEN`, `SONAR_ORGANIZATION`, and `SONAR_PROJECT_KEY` are configured
 - `.github/workflows/security.yml`: RustSec audit and cargo-deny policy checks
 - `.github/workflows/dependency-review.yml`: dependency review for pull requests
@@ -149,7 +149,7 @@ ghcr.io/<owner>/<repo>/liquidity-hub:<git-sha>
 - Coverage: `cargo llvm-cov --workspace --locked --lcov --output-path target/coverage/lcov.info`
 - Audit: RustSec through `.github/workflows/security.yml`
 - Policy: cargo-deny through `deny.toml`
-- Static analysis: CodeQL and SonarCloud
+- Static analysis: CodeQL SARIF artifacts and SonarCloud
 
 ## Chronicle Integration
 
