@@ -66,8 +66,8 @@ For SonarCloud:
 For CodeQL:
 
 - The workflow always runs Rust CodeQL analysis and stores SARIF output in the `codeql-rust-sarif` artifact.
-- Keep `CODEQL_UPLOAD` unset unless GitHub code scanning advanced setup is enabled for the repository.
-- Set repository variable `CODEQL_UPLOAD=always` only when SARIF uploads to the Security tab are supported. GitHub default setup cannot be enabled at the same time as this advanced Rust workflow.
+- Keep `CODEQL_UPLOAD` unset while GitHub CodeQL default setup is enabled for the repository.
+- Set repository variable `CODEQL_UPLOAD=always` only if default setup is disabled and SARIF uploads from advanced setup are supported. GitHub rejects uploads from advanced configurations while default setup is active.
 
 ## Local Parity
 
