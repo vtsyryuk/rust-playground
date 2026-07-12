@@ -22,10 +22,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
       - name: Audit dependencies
-        uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo audit --deny warnings
 
   deny:
     name: Cargo Deny
@@ -36,5 +37,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@cargo-deny
+
       - name: Check licenses, bans, advisories, and sources
-        uses: EmbarkStudios/cargo-deny-action@v2
+        run: cargo deny check
