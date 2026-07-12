@@ -26,17 +26,7 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: rust
-          build-mode: manual
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build
-        run: cargo build --workspace --locked
+          build-mode: none
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
-
