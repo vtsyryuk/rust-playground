@@ -172,3 +172,7 @@ Production integration should implement:
 6. Pin hub thread to a CPU and isolate it from async/admin work.
 7. Add percentile latency histograms and replay tests.
 8. Tune OS, CPU governor, IRQ affinity, NUMA placement, and container settings.
+
+## SonarCloud
+
+See [the SonarCloud setup guide](.github/SONARCLOUD.md) for analysis, coverage, activation and quality-gate behavior.
