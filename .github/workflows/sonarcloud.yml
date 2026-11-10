@@ -2,63 +2,106 @@ name: SonarCloud Analysis
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
-    branches: [main]
+    branches: [master, main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
+permissions: {}
+
+concurrency:
+  group: sonarcloud-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SONAR_ENABLED: ${{ vars.SONAR_ENABLED }}
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION || 'vtsyryuk' }}
+  SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'vtsyryuk_rust-playground' }}
 
 jobs:
-  analysis:
-    name: Analyze
+  verify:
+    name: SonarCloud build and tests
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
-      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
-
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-
+          persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: llvm-tools-preview
-
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
-      - name: Build LCOV coverage
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: Install coverage tool
+        uses: taiki-e/install-action@3f7c3597aa4e6da3f315e128de702ce61e7b2877 # cargo-llvm-cov
+      - name: Build, test, and generate LCOV coverage
         run: |
           mkdir -p target/coverage
           cargo llvm-cov --workspace --locked --lcov --output-path target/coverage/lcov.info
-
-      - name: SonarCloud token notice
-        if: env.SONAR_TOKEN == ''
-        run: |
-          echo "::notice title=SonarCloud scan skipped::Add repository secret SONAR_TOKEN from SonarCloud to enable analysis."
-
-      - name: SonarCloud project notice
-        if: env.SONAR_TOKEN != '' && (env.SONAR_ORGANIZATION == '' || env.SONAR_PROJECT_KEY == '')
-        run: |
-          echo "::notice title=SonarCloud scan skipped::Add repository variables SONAR_ORGANIZATION and SONAR_PROJECT_KEY after importing this repository in SonarCloud."
-
-      - name: Analyze with SonarCloud
-        if: env.SONAR_TOKEN != '' && env.SONAR_ORGANIZATION != '' && env.SONAR_PROJECT_KEY != ''
-        uses: SonarSource/sonarqube-scan-action@v8
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+      - name: Upload scanner inputs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          args: >
+          name: sonar-inputs
+          path: target/coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 1
+      - name: Report analysis activation state
+        shell: bash
+        run: |
+          if [ "$SONAR_ENABLED" != 'true' ]; then
+            echo '### SonarCloud analysis is not activated' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Build/test verification ran. No SonarCloud analysis or quality gate ran. Complete .github/SONARCLOUD.md and set SONAR_ENABLED=true.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  analysis:
+    name: SonarCloud analysis and quality gate
+    permissions:
+      contents: read
+      pull-requests: read
+    needs: verify
+    # Untrusted PRs still get build/test verification, without receiving a token.
+    if: vars.SONAR_ENABLED == 'true' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require analysis credentials
+        shell: bash
+        run: |
+          if [ -z "$SONAR_TOKEN" ]; then
+            echo '::error::SonarCloud is enabled but SONAR_TOKEN is missing. Add the repository secret; see .github/SONARCLOUD.md.'
+            exit 1
+          fi
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: llvm-tools-preview
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - name: Install coverage tool
+        uses: taiki-e/install-action@3f7c3597aa4e6da3f315e128de702ce61e7b2877 # cargo-llvm-cov
+      - name: Download scanner inputs
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: sonar-inputs
+          path: target/coverage
+      - name: Analyze and enforce the quality gate
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8
+        with:
+          args: |
             -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
             -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
