@@ -7,9 +7,7 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: read
+permissions: {}
 
 concurrency:
   group: sonarcloud-${{ github.event.pull_request.number || github.ref }}
@@ -23,28 +21,30 @@ env:
 jobs:
   verify:
     name: SonarCloud build and tests
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: llvm-tools-preview
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Install coverage tool
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@3f7c3597aa4e6da3f315e128de702ce61e7b2877 # cargo-llvm-cov
       - name: Build, test, and generate LCOV coverage
         run: |
           mkdir -p target/coverage
           cargo llvm-cov --workspace --locked --lcov --output-path target/coverage/lcov.info
       - name: Upload scanner inputs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sonar-inputs
           path: target/coverage/lcov.info
@@ -60,6 +60,9 @@ jobs:
 
   analysis:
     name: SonarCloud analysis and quality gate
+    permissions:
+      contents: read
+      pull-requests: read
     needs: verify
     # Untrusted PRs still get build/test verification, without receiving a token.
     if: vars.SONAR_ENABLED == 'true' && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]'))
@@ -70,7 +73,7 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -82,20 +85,20 @@ jobs:
             exit 1
           fi
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: llvm-tools-preview
       - name: Cache Cargo
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - name: Install coverage tool
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@3f7c3597aa4e6da3f315e128de702ce61e7b2877 # cargo-llvm-cov
       - name: Download scanner inputs
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: sonar-inputs
           path: target/coverage
       - name: Analyze and enforce the quality gate
-        uses: SonarSource/sonarqube-scan-action@v8
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8
         with:
           args: |
             -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
