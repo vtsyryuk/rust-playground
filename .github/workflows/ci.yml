@@ -36,6 +36,19 @@ jobs:
       - name: Release build
         run: cargo build --release --workspace --locked
 
+      - name: Verify application startup, admin endpoints, and shutdown
+        run: |
+          target/release/liquidity-hub-app --ticks 3
+          target/release/liquidity-hub-app --ticks 3 --serve-admin --port 18080 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          health=$(curl --fail --silent --show-error --max-time 5 --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:18080/health)
+          test "$health" = 'ok'
+          test "$(curl --fail --silent --show-error --max-time 5 http://127.0.0.1:18080/ready)" = 'processed=3'
+          test "$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' http://127.0.0.1:18080/unknown)" = '404'
+          kill -INT "$app_pid"
+          wait "$app_pid"
+
   docker:
     name: Docker build
     runs-on: ubuntu-latest
