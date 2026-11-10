@@ -1,5 +1,4 @@
 name: Cloud E2E
-
 on:
   deployment_status:
   schedule:
@@ -7,34 +6,24 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: Cloud service URL to test
-        required: false
+        description: Deployed liquidity-hub demo URL; alternatively configure CLOUD_BASE_URL
+        type: string
         default: ''
-
-permissions:
-  contents: read
-
+permissions: {}
 jobs:
   cloud-health:
-    name: Run Cloud Health Checks
+    name: Verify cloud demo responses and processed ticks
+    if: (github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success') && (github.event_name != 'schedule' || vars.CLOUD_BASE_URL != '')
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
-    if: github.event_name != 'deployment_status' || github.event.deployment_status.state == 'success'
+    timeout-minutes: 10
     env:
-      CLOUD_BASE_URL: ${{ inputs.base_url || vars.CLOUD_BASE_URL }}
-
+      CLOUD_BASE_URL: ${{ inputs.base_url || vars.CLOUD_BASE_URL || github.event.deployment_status.environment_url }}
+      CLOUD_EXPECTED_TICKS: ${{ vars.CLOUD_EXPECTED_TICKS || '100' }}
     steps:
-      - name: Cloud URL notice
-        if: env.CLOUD_BASE_URL == ''
-        run: |
-          echo "::notice title=Cloud E2E skipped::Set repository variable CLOUD_BASE_URL or provide workflow_dispatch input base_url."
-
-      - name: Check health endpoint
-        if: env.CLOUD_BASE_URL != ''
-        run: |
-          curl --fail --show-error --silent --max-time 10 "${CLOUD_BASE_URL%/}/health"
-
-      - name: Check readiness endpoint
-        if: env.CLOUD_BASE_URL != ''
-        run: |
-          curl --fail --show-error --silent --max-time 10 "${CLOUD_BASE_URL%/}/ready"
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify actual deployed application responses
+        run: python3 .github/scripts/cloud-e2e.py
