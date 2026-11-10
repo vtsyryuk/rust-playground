@@ -54,7 +54,8 @@ For Render deployment:
 
 For cloud verification:
 
-- Add repository variable `CLOUD_BASE_URL`.
+- Deploy the actual service, then add repository variable `CLOUD_BASE_URL`. A missing URL is not a passed cloud test.
+- The supplied smoke suite expects `LH_TICKS=100`; set `CLOUD_EXPECTED_TICKS` if intentionally different.
 - Run the `Cloud E2E` workflow manually or let the daily schedule run.
 
 For SonarCloud:

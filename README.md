@@ -24,6 +24,62 @@ The service acts as a liquidity hub:
 
 The current code is intentionally small. The hot path is in `liquidity-hub-core`, with no async runtime, no network code, and no logging.
 
+## CI Status
+
+| Check | What it verifies |
+| --- | --- |
+| CI | Formatting, Clippy, workspace tests, release binary, actual startup/admin/shutdown and Docker build |
+| Coverage | LCOV from workspace tests with `cargo-llvm-cov` |
+| SonarCloud | Actions analysis imports LCOV and waits for the Sonar way quality gate |
+| Cloud E2E | Actual deployed `/health`, `/ready` tick count, and unknown-route behavior; URL required |
+
+## Project Links
+
+- [SonarCloud project](https://sonarcloud.io/project/overview?id=vtsyryuk_rust-playground)
+- [Verified SonarCloud run](https://github.com/vtsyryuk/rust-playground/actions/runs/42792995545)
+- [Build/test CI](https://github.com/vtsyryuk/rust-playground/actions/workflows/ci.yml)
+- [Cloud E2E workflow](https://github.com/vtsyryuk/rust-playground/actions/workflows/cloud-e2e.yml)
+- [Render Blueprint](render.yaml), [container](Dockerfile), and [Kubernetes manifest](deploy/k8s/liquidity-hub.yaml)
+
+**Cloud deployment required:** no `CLOUD_BASE_URL` is configured and no hosted demo is verified. Earlier successful Cloud E2E runs only printed a missing-URL notice; they were not cloud verification. A manual run now requires a real URL, and unconfigured scheduled checks are skipped.
+
+## Requirements
+
+- Rust stable and Cargo; dependencies are pinned by `Cargo.lock`.
+- `llvm-tools-preview` and `cargo-llvm-cov` for coverage.
+- Docker for the container path; Kubernetes access only for the optional Kubernetes deployment.
+
+## Demo Deployment
+
+The demo is a CLI/API liquidity-hub replay using mock risk, analytics and market ticks. Its admin interface provides `/health` and `/ready`; it does not include a browser UI. It has no live exchange, kdb+ or Chronicle Enterprise connection.
+
+```bash
+cargo run -p liquidity-hub-app -- --ticks 100
+cargo run -p liquidity-hub-app -- --ticks 100 --serve-admin --port 8080
+```
+
+Keep the second command running in one terminal, then use another:
+
+```bash
+curl http://localhost:8080/health  # ok
+curl http://localhost:8080/ready  # processed=100
+```
+
+### Cloud Deployment — User Setup Needed
+
+1. Create a Render Blueprint from [render.yaml](render.yaml), or deploy the provided image/manifest to your own cloud.
+2. Keep `LH_SERVE_ADMIN=true` and `LH_TICKS=100` for the supplied demo checks.
+3. Set GitHub repository variable `CLOUD_BASE_URL` to the actual deployed service URL.
+4. Run **Cloud E2E**. A successful deployment-status event can also provide its `environment_url`.
+
+The workflow waits for cold-start readiness, verifies `ok`, requires `processed=100`, and checks that an unknown route returns 404. If your deployment intentionally uses another tick count, set `CLOUD_EXPECTED_TICKS` to that positive count. This is an API end-to-end smoke test; it does not claim to verify a browser UI or a live trading integration.
+
+```bash
+CLOUD_BASE_URL=https://your-actual-service.example CLOUD_EXPECTED_TICKS=100 python3 .github/scripts/cloud-e2e.py
+```
+
+A Render deployment requires connecting the Blueprint in your hosting account. Kubernetes deployment requires `KUBE_CONFIG` and explicit manual `deploy_kubernetes=true`; image publication by itself does not create a cloud service. See [CI/CD operations](docs/cicd.md).
+
 ## Architecture
 
 ```mermaid
@@ -115,7 +171,7 @@ GitHub Actions are configured with:
 - `.github/workflows/actions.yml`: actionlint validation for workflow files
 - `.github/workflows/coverage.yml`: LCOV coverage with `cargo-llvm-cov`
 - `.github/workflows/codeql.yml`: Rust CodeQL analysis with SARIF results uploaded as workflow artifacts
-- `.github/workflows/sonarcloud.yml`: SonarCloud analysis when `SONAR_TOKEN`, `SONAR_ORGANIZATION`, and `SONAR_PROJECT_KEY` are configured
+- `.github/workflows/sonarcloud.yml`: SonarCloud analysis with LCOV import and an enforced quality gate; `SONAR_ENABLED=true` is active
 - `.github/workflows/security.yml`: RustSec audit and cargo-deny policy checks
 - `.github/workflows/dependency-review.yml`: dependency review for pull requests
 - `.github/workflows/dependency-submission.yml`: Cargo dependency snapshot submission to GitHub's dependency graph
@@ -175,4 +231,4 @@ Production integration should implement:
 
 ## SonarCloud
 
-See [the SonarCloud setup guide](.github/SONARCLOUD.md) for analysis, coverage, activation and quality-gate behavior.
+GitHub Actions owns analysis; Automatic Analysis is disabled and the SonarCloud primary branch is aligned to `main`. See [the SonarCloud setup guide](.github/SONARCLOUD.md) for coverage, activation and quality-gate behavior.
